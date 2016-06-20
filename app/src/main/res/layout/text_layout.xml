@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+        <cn.rosen.sticktextview.view.SizeAdjustingTextView
+            android:id="@+id/content_layout_txt"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:textColor="@android:color/black"
+            android:background="@android:color/transparent"
+            />
+</LinearLayout>
