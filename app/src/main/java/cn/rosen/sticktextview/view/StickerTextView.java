@@ -63,6 +63,9 @@ public class StickerTextView extends View {
     private DisplayMetrics dm;
     private boolean isMove;
 
+    private float oldx1, oldy1, oldx2, oldy2;
+    private float roatetAngle = 0;
+
     private OnStickerTextTouchListener mOnStickerTouchListener;
     private Paint mTextPaint;
 
@@ -150,15 +153,16 @@ public class StickerTextView extends View {
 
     /**
      * 添加textView
-     * @param textView textview对象
-     * @param left 左边界
-     * @param top 上边界
-     * @param right 右边界
-     * @param bottom 下边界
+     *
+     * @param textView     textview对象
+     * @param left         左边界
+     * @param top          上边界
+     * @param right        右边界
+     * @param bottom       下边界
      * @param isSingleLine 是否单行，单行可自动调节边框大小
-     * @param nums 字数限制
+     * @param nums         字数限制
      */
-    public void addTextDraw(TextView textView, float left, float top, float right, float bottom, boolean isSingleLine,int nums) {
+    public void addTextDraw(TextView textView, float left, float top, float right, float bottom, boolean isSingleLine, int nums) {
         float x = dpToPx(left);
         float y = dpToPx(top);
         float r = dpToPx(right);
@@ -168,10 +172,10 @@ public class StickerTextView extends View {
         textView.setTop((int) y);
         if (isSingleLine) {
             textView.setRight((int) (getCharacterWidth(textView) + textView.getLeft()));
-            mOriginTextRect = new RectF(x,y,(int) (getCharacterWidth(textView) + textView.getLeft()),b);
+            mOriginTextRect = new RectF(x, y, (int) (getCharacterWidth(textView) + textView.getLeft()), b);
         } else {
             textView.setRight((int) r);
-            mOriginTextRect = new RectF(x,y,r,b);
+            mOriginTextRect = new RectF(x, y, r, b);
         }
         textView.setBottom((int) b);
         Canvas canvas = new Canvas();
@@ -179,12 +183,13 @@ public class StickerTextView extends View {
             canvas.translate(x, y);
         }
         canvas.setBitmap(mBitmap);
-        bank.put(++imageCount, new TextViewItem(textView, canvas, isSingleLine,mOriginTextRect,nums));
+        bank.put(++imageCount, new TextViewItem(textView, canvas, isSingleLine, mOriginTextRect, nums));
         postInvalidate();
     }
 
     /**
      * 更新文字
+     *
      * @param textView
      * @param isSingLine
      */
@@ -239,10 +244,10 @@ public class StickerTextView extends View {
             int bottom = textViewItem.getTextView().getBottom();
             float[] mOriginTextPoints;
             float[] mTextPoints = new float[8];
-            if(TextUtils.isEmpty(textViewItem.getTextView().getText())){
+            if (TextUtils.isEmpty(textViewItem.getTextView().getText())) {
                 RectF rectF = textViewItem.getmOriginTextRect();
                 mOriginTextPoints = new float[]{rectF.left, rectF.top, rectF.right, rectF.top, rectF.right, rectF.bottom, rectF.left, rectF.bottom};
-            }else {
+            } else {
                 mOriginTextPoints = new float[]{left, top, right, top, right, bottom, left, bottom};
             }
             //文字和边框映射
@@ -267,6 +272,7 @@ public class StickerTextView extends View {
             textViewItem.getCanvas().setDrawFilter(new PaintFlagsDrawFilter(0, Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
             textViewItem.getTextView().draw(textViewItem.getCanvas());
         }
+        //花边框和控制点
         if (mDrawController) {
             canvas.drawLine(mPoints[0], mPoints[1], mPoints[2], mPoints[3], mBorderPaint);
             canvas.drawLine(mPoints[2], mPoints[3], mPoints[4], mPoints[5], mBorderPaint);
@@ -351,117 +357,190 @@ public class StickerTextView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (mOnStickerTouchListener != null) {
+            mOnStickerTouchListener.onTextMoveToHead(this);
+        }
         if (mViewRect == null) {
             mViewRect = new RectF(0f, 0f, getMeasuredWidth(), getMeasuredHeight());
         }
-        float x = event.getX();
-        float y = event.getY();
-        int action = MotionEventCompat.getActionMasked(event);
-        switch (action) {
-            case MotionEvent.ACTION_DOWN:
-                if (isInController(x, y)) {
-                    mInController = true;
-                    mLastPointY = y;
-                    mLastPointX = x;
-                    midPointToStartPoint(x, y);
-                } else if (isInDelete(x, y)) {
-                    mInDelete = true;
-                } else if (isInCopy(x, y)) {
-                    if (mOnStickerTouchListener != null) {
-                        mOnStickerTouchListener.onTextCopy(this);
-                    }
-                } else if (mContentRect.contains(x, y)) {
-                    setShowDrawController(true);
-                    mLastPointY = y;
-                    mLastPointX = x;
-                    mInMove = true;
-                    isMove = false;
-                    if (mOnStickerTouchListener != null) {
-                        mOnStickerTouchListener.onTextMoveToHead(this);
-                    }
-                    //单击
-                    for (Integer id : bank.keySet()) {
-                        TextViewItem textViewItem = bank.get(id);
-                        int left = textViewItem.getTextView().getLeft();
-                        int top = textViewItem.getTextView().getTop();
-                        int right = textViewItem.getTextView().getRight();
-                        int bottom = textViewItem.getTextView().getBottom();
-                        RectF mOriginTextRect;
-                        if(TextUtils.isEmpty(textViewItem.getTextView().getText())){
-                            mOriginTextRect = textViewItem.getmOriginTextRect();
-                        }else {
-                            mOriginTextRect = new RectF(left, top, right, bottom);
+        if (event.getPointerCount() == 1)//单点触控
+        {
+            float x = event.getX();
+            float y = event.getY();
+            int action = MotionEventCompat.getActionMasked(event);
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                    if (isInController(x, y)) {
+                        mInController = true;
+                        mLastPointY = y;
+                        mLastPointX = x;
+                        midPointToStartPoint(x, y);
+                    } else if (isInDelete(x, y)) {
+                        mInDelete = true;
+                    } else if (isInCopy(x, y)) {
+                        if (mOnStickerTouchListener != null) {
+                            mOnStickerTouchListener.onTextCopy(this);
                         }
-                        RectF mTextRect = new RectF();
-                        mMatrix.mapRect(mTextRect, mOriginTextRect);
-                        if (mTextRect.contains(x, y)) {
-//                            Log.i(TAG,"单击");
-//                            Log.i(TAG,x-mContentRect.left+"==="+textViewItem.left);
-//                            Log.i(TAG,x-mContentRect.left+"==="+textViewItem.right);
-//                            Log.i(TAG,y-mContentRect.top+"==="+textViewItem.top);
-//                            Log.i(TAG,y-mContentRect.top+"==="+textViewItem.bottom);
-                            //单击文字
-                            if (mOnStickerTouchListener != null) {
-                                mOnStickerTouchListener.onTextClickCurrentText(textViewItem);
+                    } else if (mContentRect.contains(x, y)) {
+                        setShowDrawController(true);
+                        mLastPointY = y;
+                        mLastPointX = x;
+                        mInMove = true;
+                        isMove = false;
+
+                        //单击
+                        for (Integer id : bank.keySet()) {
+                            TextViewItem textViewItem = bank.get(id);
+                            int left = textViewItem.getTextView().getLeft();
+                            int top = textViewItem.getTextView().getTop();
+                            int right = textViewItem.getTextView().getRight();
+                            int bottom = textViewItem.getTextView().getBottom();
+                            RectF mOriginTextRect;
+                            if (TextUtils.isEmpty(textViewItem.getTextView().getText())) {
+                                mOriginTextRect = textViewItem.getmOriginTextRect();
+                            } else {
+                                mOriginTextRect = new RectF(left, top, right, bottom);
+                            }
+                            RectF mTextRect = new RectF();
+                            mMatrix.mapRect(mTextRect, mOriginTextRect);
+                            if (mTextRect.contains(x, y)) {
+                                //单击文字
+                                if (mOnStickerTouchListener != null) {
+                                    mOnStickerTouchListener.onTextClickCurrentText(textViewItem);
+                                }
                             }
                         }
+                    } else {
+                        setShowDrawController(false);
+                        return false;
                     }
-                } else {
-                    setShowDrawController(false);
-                    return false;
-                }
-                break;
-            case MotionEvent.ACTION_UP:
-                mInController = false;
-                if (isInDelete(x, y) && mInDelete) {
+                    break;
+                case MotionEvent.ACTION_UP:
+                    mInController = false;
+                    if (isInDelete(x, y) && mInDelete) {
+                        mInDelete = false;
+                        doDeleteSticker();
+                    }
+                case MotionEvent.ACTION_CANCEL:
+                    mLastPointX = 0;
+                    mLastPointY = 0;
+                    mInController = false;
+                    mInMove = false;
                     mInDelete = false;
-                    doDeleteSticker();
-                }
-            case MotionEvent.ACTION_CANCEL:
-                mLastPointX = 0;
-                mLastPointY = 0;
-                mInController = false;
-                mInMove = false;
-                mInDelete = false;
-                break;
-            case MotionEvent.ACTION_MOVE:
-                if (mInController) {
-                    mMatrix.postRotate(rotation(event), mid.x, mid.y);//mPoints[8], mPoints[9]
-                    float nowLenght = caculateLength(mPoints[4], mPoints[5]);
-                    float touchLenght = caculateLength(event.getX(), event.getY());
-                    if ((float) Math.sqrt((nowLenght - touchLenght) * (nowLenght - touchLenght)) > 0.0f) {
-                        float scale = touchLenght / nowLenght;
-                        float nowsc = mStickerScaleSize * scale;
-                        if (nowsc >= MIN_SCALE_SIZE && nowsc <= MAX_SCALE_SIZE) {
-                            mMatrix.postScale(scale, scale, mid.x, mid.y);
-                            mStickerScaleSize = nowsc;
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (mInController) {
+                        mMatrix.postRotate(rotation(event), mid.x, mid.y);//mPoints[8], mPoints[9]
+                        float nowLenght = caculateLength(mPoints[4], mPoints[5]);
+                        float touchLenght = caculateLength(event.getX(), event.getY());
+                        if ((float) Math.sqrt((nowLenght - touchLenght) * (nowLenght - touchLenght)) > 0.0f) {
+                            float scale = touchLenght / nowLenght;
+                            float nowsc = mStickerScaleSize * scale;
+                            if (nowsc >= MIN_SCALE_SIZE && nowsc <= MAX_SCALE_SIZE) {
+                                mMatrix.postScale(scale, scale, mid.x, mid.y);
+                                mStickerScaleSize = nowsc;
 //                            Log.i(TAG, mStickerScaleSize +"缩放比例");
+                            }
                         }
+                        invalidate();
+                        mLastPointX = x;
+                        mLastPointY = y;
+                        break;
+                    }
+                    if (mInMove) { //拖动的操作
+                        float cX = x - mLastPointX;
+                        float cY = y - mLastPointY;
+                        mInController = false;
+                        //判断手指抖动距离 加上isMove判断 只要移动过 都是true
+                        if (!isMove && Math.abs(cX) < 0.5f
+                                && Math.abs(cY) < 0.5f) {
+                            isMove = false;
+                        } else {
+                            isMove = true;
+                        }
+                        mMatrix.postTranslate(cX, cY);
+                        postInvalidate();
+                        mLastPointX = x;
+                        mLastPointY = y;
+                        break;
                     }
                     invalidate();
-                    mLastPointX = x;
-                    mLastPointY = y;
-                    break;
-                }
-                if (mInMove) { //拖动的操作
-                    float cX = x - mLastPointX;
-                    float cY = y - mLastPointY;
-                    mInController = false;
-                    //判断手指抖动距离 加上isMove判断 只要移动过 都是true
-                    if (!isMove && Math.abs(cX) < 0.5f
-                            && Math.abs(cY) < 0.5f) {
-                        isMove = false;
+                    return true;
+            }
+        } else {
+            //多点触控
+            switch (event.getAction() & MotionEvent.ACTION_MASK) {
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    float x1 = event.getX(0);
+                    float x2 = event.getX(1);
+                    float y1 = event.getY(0);
+                    float y2 = event.getY(1);
+                    if (mContentRect.contains(x1, y1) || mContentRect.contains(x2, y2)) {
+                        setShowDrawController(true);
+                        mInController = true;
+                        oldx1 = x1;
+                        oldy1 = y1;
+                        oldx2 = x2;
+                        oldy2 = y2;
                     } else {
-                        isMove = true;
+                        setShowDrawController(false);
+                        return false;
                     }
-                    mMatrix.postTranslate(cX, cY);
-                    postInvalidate();
-                    mLastPointX = x;
-                    mLastPointY = y;
                     break;
-                }
-                return true;
+                case MotionEvent.ACTION_MOVE:
+                    x1 = event.getX(0);
+                    x2 = event.getX(1);
+                    y1 = event.getY(0);
+                    y2 = event.getY(1);
+                    if (mInController) {
+                        float xa = oldx2 - oldx1;
+                        float ya = oldy2 - oldy1;
+
+                        float xb = x2 - x1;
+                        float yb = y2 - y1;
+
+                        float nowLenght = (float) Math.sqrt(xa * xa + ya * ya);
+                        float touchLenght = (float) Math.sqrt(xb * xb + yb * yb);
+                        if ((float) Math.sqrt((nowLenght - touchLenght) * (nowLenght - touchLenght)) > 0.0f) {
+                            float scale = touchLenght / nowLenght;
+                            float nowsc = mStickerScaleSize * scale;
+                            if (nowsc >= MIN_SCALE_SIZE && nowsc <= MAX_SCALE_SIZE) {
+                                mMatrix.postScale(scale, scale, mContentRect.centerX(), mContentRect.centerY());
+                                mStickerScaleSize = nowsc;
+                                //Log.i(TAG, mStickerScaleSize +"缩放比例");
+                            }
+                            double cos = (xa * xb + ya * yb) / (nowLenght * touchLenght);
+                            if (cos > 1 || cos < -1) {
+                                return false;
+                            }
+                            float angle = (float) Math.toDegrees(Math.acos(cos));
+
+                            // 拉普拉斯定理
+                            float calMatrix = xa * yb - xb * ya;// 行列式计算 确定转动方向
+
+                            int flag = calMatrix > 0 ? 1 : -1;
+                            angle = flag * angle;
+                            // System.out.println("angle--->" + angle);
+                            roatetAngle += angle;
+                            mMatrix.postRotate(angle, mContentRect.centerX(), mContentRect.centerY());
+                            invalidate();
+                        }
+
+                        oldx1 = x1;
+                        oldy1 = y1;
+                        oldx2 = x2;
+                        oldy2 = y2;
+                        break;
+                    }
+
+                case MotionEvent.ACTION_POINTER_UP:
+                    mInController = false;
+                    mInMove = false;
+                    mInDelete = false;
+                    break;
+            }
         }
+        invalidate();
         return true;
     }
 
@@ -518,7 +597,7 @@ public class StickerTextView extends View {
      * @param x
      * @param y
      */
-    private void  midPointToStartPoint(float x, float y) {
+    private void midPointToStartPoint(float x, float y) {
         float[] arrayOfFloat = new float[9];
         mMatrix.getValues(arrayOfFloat);
         float f1 = 0.0f * arrayOfFloat[0] + 0.0f * arrayOfFloat[1] + arrayOfFloat[2];
